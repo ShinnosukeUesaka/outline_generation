@@ -1,107 +1,68 @@
-import json
-import os
-import time
-from pathlib import Path
+import pathlib
 
-import requests
-from dotenv import load_dotenv
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
-KIE_API_URL = "https://api.kie.ai/api/v1/generate"
-KIE_RECORD_URL = "https://api.kie.ai/api/v1/generate/record-info"
-
-FAILURE_STATUSES = {
-    "CREATE_TASK_FAILED",
-    "GENERATE_AUDIO_FAILED",
-    "SENSITIVE_WORD_ERROR",
-    "CALLBACK_EXCEPTION",
-}
-
-POLL_INTERVAL = 30
-MAX_POLL_TIME = 600
+from generate_lyrics.from_phrases import generate_lyrics_from_phrases
+from generate_lyrics.from_video import generate_lyrics_from_video
+from models import Lyrics
+from util.get_time_stamp import align_lyrics, extract_timestamps
+from util.kie_api import generate_music_kie
 
 
-def generate_music(
-    prompt: str,
-    style: str,
-    title: str,
-    model: str = "V4",
-    output_path: str | Path | None = None,
-    instrumental: bool = False,
-    negative_tags: str | None = None,
-) -> dict:
-    api_key = os.environ["KIE_API_KEY"]
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    }
+def compose_music(lyrics: Lyrics, output_dir: pathlib.Path) -> None:
+    """Generate music MP3 from lyrics using KIE AI."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    generate_music_kie(
+        prompt="\n".join(lyrics.lyrics_for_ai),
+        style=lyrics.genre,
+        title="Generated Song",
+        output_path=output_dir / "music.mp3",
+    )
+    print(f"Music saved to: {output_dir / 'music.mp3'}")
 
-    payload = {
-        "prompt": prompt,
-        "style": style,
-        "title": title,
-        "model": model,
-        "customMode": True,
-        "instrumental": instrumental,
-        "callBackUrl": "https://example.com/callback",
-    }
-    if negative_tags:
-        payload["negativeTags"] = negative_tags
 
-    resp = requests.post(KIE_API_URL, headers=headers, json=payload)
-    resp.raise_for_status()
-    data = resp.json()
+def generate_timestamps(lyrics: Lyrics, output_dir: pathlib.Path) -> str:
+    """Extract timestamps from generated music and align with lyrics."""
+    music_path = output_dir / "music.mp3"
+    timestamped_words = extract_timestamps(music_path)
+    aligned_lyrics = align_lyrics("\n".join(lyrics.lyrics_for_ai), timestamped_words)
+    return aligned_lyrics
 
-    if data.get("code") != 200:
-        raise RuntimeError(f"Generation request failed: {data}")
 
-    task_id = data["data"]["taskId"]
-    print(f"Task submitted: {task_id}")
+def save_info(lyrics: Lyrics, aligned_lyrics: str, output_dir: pathlib.Path) -> None:
+    """Write info.txt with genre, lyrics, aligned lyrics, and kanji lyrics."""
+    all_info = f"""
+genre: {lyrics.genre}
+lyrics_for_ai: {lyrics.lyrics_for_ai}
+aligned_lyrics: {aligned_lyrics}
+lyrics: {lyrics.lyrics}
+"""
+    with open(output_dir / "info.txt", "w") as f:
+        f.write(all_info)
+    print(f"Info saved to: {output_dir / 'info.txt'}")
 
-    start = time.time()
-    while time.time() - start < MAX_POLL_TIME:
-        time.sleep(POLL_INTERVAL)
-        poll_resp = requests.get(
-            KIE_RECORD_URL,
-            headers=headers,
-            params={"taskId": task_id},
-        )
-        poll_resp.raise_for_status()
-        poll_data = poll_resp.json()
 
-        if poll_data.get("code") != 200:
-            raise RuntimeError(f"Poll request failed: {poll_data}")
+def run_pipeline(lyrics: Lyrics, output_dir: pathlib.Path) -> None:
+    """Run the full pipeline: compose music, extract timestamps, save info."""
+    compose_music(lyrics, output_dir)
+    aligned_lyrics = generate_timestamps(lyrics, output_dir)
+    save_info(lyrics, aligned_lyrics, output_dir)
 
-        record = poll_data["data"]
-        status = record.get("status", "")
-        print(f"Status: {status}")
 
-        if status in FAILURE_STATUSES:
-            raise RuntimeError(f"Generation failed with status: {status}\n{json.dumps(record, indent=2)}")
+def from_video(video_url: str, genre: str, output_dir: pathlib.Path) -> Lyrics:
+    """Convenience: generate lyrics from video and run the full pipeline."""
+    lyrics = generate_lyrics_from_video(video_url, genre)
+    run_pipeline(lyrics, output_dir)
+    return lyrics
 
-        if status == "SUCCESS":
-            tracks = record.get("data", [])
-            if output_path and tracks:
-                audio_url = tracks[0].get("audioUrl")
-                if audio_url:
-                    print(f"Downloading audio to {output_path}")
-                    audio_resp = requests.get(audio_url)
-                    audio_resp.raise_for_status()
-                    out = Path(output_path)
-                    out.parent.mkdir(parents=True, exist_ok=True)
-                    out.write_bytes(audio_resp.content)
-            return record
 
-    raise TimeoutError(f"Generation did not complete within {MAX_POLL_TIME}s")
+def from_phrases(phrases: list[str], genre: str, output_dir: pathlib.Path) -> Lyrics:
+    """Convenience: generate lyrics from phrases and run the full pipeline."""
+    lyrics = generate_lyrics_from_phrases(phrases, genre)
+    run_pipeline(lyrics, output_dir)
+    return lyrics
 
 
 if __name__ == "__main__":
-    result = generate_music(
-        prompt="[Verse]\nHello world, this is a test\nLearning music, we're the best\n\n[Chorus]\nCode and music, side by side\nOn this journey, enjoy the ride",
-        style="pop, upbeat, educational",
-        title="Test Song",
-        model="V4",
-        output_path="test_output.mp3",
-    )
-    print(json.dumps(result, indent=2))
+    video_url = "https://www.youtube.com/watch?v=q-PdhDzqimg"
+    j_rustic_indie = "earthy acoustic instruments mixed with japanese indie rock sensibility. short entro"
+    resources_path = pathlib.Path("../resources")
+    from_video(video_url, j_rustic_indie, output_dir=resources_path / "muromati_v5")
