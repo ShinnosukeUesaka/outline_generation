@@ -2,21 +2,25 @@ import pathlib
 
 from generate_lyrics.from_phrases import generate_lyrics_from_phrases
 from generate_lyrics.from_video import generate_lyrics_from_video
+from generate_lyrics.mixed_language import generate_mixed_language_lyrics
 from models import Lyrics
 from util.get_time_stamp import align_lyrics, extract_timestamps
 from util.kie_api import generate_music_kie
 
 
-def compose_music(lyrics: Lyrics, output_dir: pathlib.Path) -> None:
+def compose_music(lyrics: Lyrics, genre: str, output_dir: pathlib.Path) -> None:
     """Generate music MP3 from lyrics using KIE AI."""
     output_dir.mkdir(parents=True, exist_ok=True)
+    music_path = output_dir / "music.mp3"
     generate_music_kie(
         prompt="\n".join(lyrics.lyrics_for_ai),
-        style=lyrics.genre,
+        style=genre,
         title="Generated Song",
-        output_path=output_dir / "music.mp3",
+        output_path=music_path,
     )
-    print(f"Music saved to: {output_dir / 'music.mp3'}")
+    if not music_path.exists():
+        raise RuntimeError(f"Music file was not saved to {music_path}. KIE API may have returned no audio tracks.")
+    print(f"Music saved to: {music_path}")
 
 
 def generate_timestamps(lyrics: Lyrics, output_dir: pathlib.Path) -> str:
@@ -28,9 +32,8 @@ def generate_timestamps(lyrics: Lyrics, output_dir: pathlib.Path) -> str:
 
 
 def save_info(lyrics: Lyrics, aligned_lyrics: str, output_dir: pathlib.Path) -> None:
-    """Write info.txt with genre, lyrics, aligned lyrics, and kanji lyrics."""
+    """Write info.txt with lyrics, aligned lyrics, and kanji lyrics."""
     all_info = f"""
-genre: {lyrics.genre}
 lyrics_for_ai: {lyrics.lyrics_for_ai}
 aligned_lyrics: {aligned_lyrics}
 lyrics: {lyrics.lyrics}
@@ -40,9 +43,9 @@ lyrics: {lyrics.lyrics}
     print(f"Info saved to: {output_dir / 'info.txt'}")
 
 
-def run_pipeline(lyrics: Lyrics, output_dir: pathlib.Path) -> None:
+def run_pipeline(lyrics: Lyrics, genre: str, output_dir: pathlib.Path) -> None:
     """Run the full pipeline: compose music, extract timestamps, save info."""
-    compose_music(lyrics, output_dir)
+    compose_music(lyrics, genre, output_dir)
     aligned_lyrics = generate_timestamps(lyrics, output_dir)
     save_info(lyrics, aligned_lyrics, output_dir)
 
@@ -50,19 +53,40 @@ def run_pipeline(lyrics: Lyrics, output_dir: pathlib.Path) -> None:
 def from_video(video_url: str, genre: str, output_dir: pathlib.Path) -> Lyrics:
     """Convenience: generate lyrics from video and run the full pipeline."""
     lyrics = generate_lyrics_from_video(video_url, genre)
-    run_pipeline(lyrics, output_dir)
+    run_pipeline(lyrics, genre, output_dir)
     return lyrics
 
 
 def from_phrases(phrases: list[str], genre: str, output_dir: pathlib.Path) -> Lyrics:
     """Convenience: generate lyrics from phrases and run the full pipeline."""
     lyrics = generate_lyrics_from_phrases(phrases, genre)
-    run_pipeline(lyrics, output_dir)
+    run_pipeline(lyrics, genre, output_dir)
+    return lyrics
+
+
+def from_mixed_language(phrases: list[str], genre: str, output_dir: pathlib.Path) -> Lyrics:
+    """Convenience: generate mixed-language lyrics from phrases and run the full pipeline."""
+    lyrics = generate_mixed_language_lyrics(phrases, genre)
+    run_pipeline(lyrics, genre, output_dir)
     return lyrics
 
 
 if __name__ == "__main__":
-    video_url = "https://www.youtube.com/watch?v=q-PdhDzqimg"
-    j_rustic_indie = "earthy acoustic instruments mixed with japanese indie rock sensibility. short entro"
+    # video_url = "https://www.youtube.com/watch?v=q-PdhDzqimg"
+    # j_rustic_indie = "earthy acoustic instruments mixed with japanese indie rock sensibility. short entro"
+    # resources_path = pathlib.Path("../resources")
+    # from_video(video_url, j_rustic_indie, output_dir=resources_path / "muromati_v5")
+
+    phrases = [
+        "small",
+        "big",
+        "always",
+        "listen",
+        "give",
+        "count",
+        "while",
+        "learn"
+    ]
+    genre = "earthy acoustic instruments mixed with japanese indie rock sensibility. short intro"
     resources_path = pathlib.Path("../resources")
-    from_video(video_url, j_rustic_indie, output_dir=resources_path / "muromati_v5")
+    from_mixed_language(phrases, genre, output_dir=resources_path / "mixed_language_v1")

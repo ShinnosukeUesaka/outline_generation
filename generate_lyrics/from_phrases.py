@@ -1,6 +1,6 @@
 import openai
 
-from models import CompositionPlan, Lyrics
+from models import Lyrics
 
 client = openai.OpenAI()
 
@@ -22,17 +22,10 @@ def generate_lyrics_from_phrases(phrases: list[str], genre: str) -> Lyrics:
         messages=[
             {"role": "user", "content": PROMPT.format(genre=genre) + "\n\nPhrases: " + "\n".join(phrases)},
         ],
-        response_format=CompositionPlan,
+        response_format=Lyrics,
         reasoning_effort="low",
     )
 
-    plan = completion.choices[0].message.parsed
-    lyrics_for_ai = [line for section in plan.sections for line in section.lines]
-    lyrics = [line for section in plan.sections for line in section.lines_in_kanji]
-
-    print(plan)
-    return Lyrics(
-        genre=genre,
-        lyrics_for_ai=lyrics_for_ai,
-        lyrics=lyrics,
-    )
+    lyrics = completion.choices[0].message.parsed
+    print(lyrics)
+    return lyrics

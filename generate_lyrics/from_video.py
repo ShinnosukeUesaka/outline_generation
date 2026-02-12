@@ -3,8 +3,7 @@ import subprocess
 import tempfile
 
 import openai
-
-from models import CompositionPlan, Lyrics
+from models import Lyrics
 
 client = openai.OpenAI()
 
@@ -16,9 +15,7 @@ Tips on lyrics:
 
 
 Tips
-- Style should be 1-3 words long.
 - The whole song should be under 12 lines.
-- 30 characters is about 5 seconds of lyrics, make sure to calculate the duration of each section based on this.
 - Do not put any symbols in the lyrics.
 - The lyrics must make sense and be clear instead of just repeating key words. Do not make the lyrics too catchy that it doesn't make sense.
 - The lyrics should be in hiragana and katakana unless the kanji is very easy and obvious how to read it.
@@ -50,17 +47,10 @@ def generate_lyrics_from_video(video_url: str, genre: str) -> Lyrics:
             messages=[
                 {"role": "user", "content": PROMPT.format(genre=genre) + "\n\nTranscript: " + transcript_text},
             ],
-            response_format=CompositionPlan,
+            response_format=Lyrics,
             reasoning_effort="low",
         )
 
-        plan = completion.choices[0].message.parsed
-        lyrics_for_ai = [line for section in plan.sections for line in section.lines]
-        lyrics = [line for section in plan.sections for line in section.lines_in_kanji]
-
-        print(plan)
-        return Lyrics(
-            genre=genre,
-            lyrics_for_ai=lyrics_for_ai,
-            lyrics=lyrics,
-        )
+        lyrics = completion.choices[0].message.parsed
+        print(lyrics)
+        return lyrics

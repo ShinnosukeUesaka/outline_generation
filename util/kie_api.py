@@ -81,7 +81,8 @@ def generate_music_kie(
             raise RuntimeError(f"Generation failed with status: {status}\n{json.dumps(record, indent=2)}")
 
         if status == "SUCCESS":
-            tracks = record.get("data", [])
+            print(f"Record data: {json.dumps(record, indent=2)}")
+            tracks = record.get("response", {}).get("sunoData", [])
             if output_path and tracks:
                 audio_url = tracks[0].get("audioUrl")
                 if audio_url:

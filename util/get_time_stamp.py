@@ -12,7 +12,7 @@ def extract_timestamps(music_path: Path) -> str:
     """
     with open(music_path, "rb") as audio_file:
         transcription = client.audio.transcriptions.create(
-            model="gpt-4o-transcribe",
+            model="whisper-1",
             file=audio_file,
             response_format="verbose_json",
             timestamp_granularities=["word"],

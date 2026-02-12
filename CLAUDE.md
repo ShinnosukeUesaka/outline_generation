@@ -10,7 +10,7 @@ uv run python generate_music.py
 Use pathlib when ever possible.
 
 ## Module Structure
-- `models.py` — Shared data models (Section, CompositionPlan, Lyrics)
+- `models.py` — Shared data models (Lyrics)
 - `generate_music.py` — Top-level orchestrator (entry point)
 - `generate_lyrics/` — Lyrics generation from video or phrases
 - `util/kie_api.py` — KIE AI music generation wrapper
