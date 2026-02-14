@@ -26,7 +26,7 @@ def generate_music_kie(
     prompt: str,
     style: str,
     title: str,
-    model: str = "V4",
+    model: str = "V5",
     output_path: str | Path | None = None,
     instrumental: bool = False,
     negative_tags: str | None = None,
@@ -36,6 +36,13 @@ def generate_music_kie(
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
     }
+
+    print(f"Generating music with lyrics: {prompt}")
+    print(f"Style: {style}")
+    print(f"Title: {title}")
+    print(f"Model: {model}")
+    print(f"Instrumental: {instrumental}")
+    print(f"Negative tags: {negative_tags}")
 
     payload = {
         "prompt": prompt,

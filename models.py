@@ -2,6 +2,6 @@ import pydantic
 
 
 class Lyrics(pydantic.BaseModel):
-    lyrics: list[str]
-    lyrics_for_ai: list[str]
+    lyrics: str
+    lyrics_for_ai: str
     
